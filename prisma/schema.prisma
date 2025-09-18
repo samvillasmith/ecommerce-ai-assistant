@@ -1,0 +1,21 @@
+generator client {
+  provider = "prisma-client-py"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+
+model Product {
+  id           Int     @id @default(autoincrement()) @map("ProductID")
+  name         String  @db.VarChar(255)              @map("ProductName")
+  brand        String? @db.VarChar(255)              @map("ProductBrand")
+  gender       String? @db.VarChar(50)               @map("Gender")
+  price        String? @db.VarChar(50)               @map("Price")        
+  description  String? @db.Text                      @map("Description")
+  primaryColor String? @db.VarChar(50)               @map("PrimaryColor")
+
+  @@map("products")
+}
