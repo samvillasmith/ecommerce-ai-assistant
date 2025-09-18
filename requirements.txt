@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+python-dotenv
+SQLAlchemy>=2.0
+asyncmy
+pydantic
+pandas
