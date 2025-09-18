@@ -5,3 +5,9 @@ SQLAlchemy>=2.0
 asyncmy
 pydantic
 pandas
+prisma
+langchain
+langchain_google_genai
+pinecone
+tqdm
+langchain-google-vertexai
