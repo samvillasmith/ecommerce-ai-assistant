@@ -11,3 +11,5 @@ langchain_google_genai
 pinecone
 tqdm
 langchain-google-vertexai
+langchain-pinecone
+google-generativeai

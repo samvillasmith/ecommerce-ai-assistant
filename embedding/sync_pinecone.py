@@ -55,15 +55,16 @@ def safe(val):  # None-safe str()
 
 
 def build_text(row: dict) -> str:
-    return " ".join([
+    parts = [
         safe(row.get("description")),
         safe(row.get("name")),
         safe(row.get("brand")),
         safe(row.get("gender")),
         safe(row.get("price")),
         safe(row.get("primaryColor")),
-    ]).strip()
-
+    ]
+    # drop empty strings and normalize any stray whitespace
+    return " ".join(p for p in parts if p).strip()
 
 def main():
     # Pinecone client
