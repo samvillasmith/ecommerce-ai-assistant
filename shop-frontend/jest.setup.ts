@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-require-imports */
 // jest.setup.ts
 import "@testing-library/jest-dom";
 import "whatwg-fetch"; // fetch, Request, Response, Headers for jsdom
@@ -6,9 +8,9 @@ import "web-streams-polyfill/polyfill";
 
 // TextEncoder/TextDecoder for MSW/interceptors
 import { TextEncoder, TextDecoder } from "util";
-// @ts-ignore
+
 if (!(global as any).TextEncoder) (global as any).TextEncoder = TextEncoder as any;
-// @ts-ignore
+
 if (!(global as any).TextDecoder) (global as any).TextDecoder = TextDecoder as any;
 
 // Web Streams (TransformStream/ReadableStream/WritableStream) for MSW v2
