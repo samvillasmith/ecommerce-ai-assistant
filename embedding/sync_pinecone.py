@@ -13,24 +13,43 @@ from providers.embeddings import get_embeddings
 load_dotenv()
 
 # --- constants ---
-EMBEDDING_DIM = 768  # text-embedding-004 (Vertex) and models/embedding-001 (GenAI) are 768
+EMBEDDING_DIM = 768  # text-embedding-004 & models/embedding-001 -> 768 dims
 PINECONE_INDEX = os.getenv("PINECONE_INDEX_NAME", "ecommerce-ai-assistant")
 PINECONE_CLOUD = os.getenv("PINECONE_CLOUD", "aws")
 PINECONE_REGION = os.getenv("PINECONE_REGION", "us-east-1")
 
 
+# --- price normalization (same rule as gemini_chain) --------------------------
+def _format_price(value, currency: str = "$") -> str | None:
+    if value is None:
+        return None
+    try:
+        if isinstance(value, str):
+            s = value.strip()
+            if s.replace(".", "", 1).isdigit():
+                value = float(s) if "." in s else int(s)
+            else:
+                return None
+        if isinstance(value, int):
+            dollars = value / 100.0
+            return f"{currency}{dollars:,.2f}"
+        if isinstance(value, float):
+            return f"{currency}{value:,.2f}"
+        return None
+    except Exception:
+        return None
+
+
 def ensure_pinecone_index(pc: Pinecone, index_name: str, dimension: int):
     spec = ServerlessSpec(cloud=PINECONE_CLOUD, region=PINECONE_REGION)
-
     exists = any(i["name"] == index_name for i in pc.list_indexes())
     if not exists:
         pc.create_index(name=index_name, dimension=dimension, metric="cosine", spec=spec)
-    # Wait until ready
+
     while not pc.describe_index(index_name).status["ready"]:
         print(f"Please stand by. The pinecone index {index_name} is preparing.")
         time.sleep(5)
 
-    # Verify dimension matches (cannot change after creation)
     desc = pc.describe_index(index_name)
     if desc.dimension != dimension:
         raise RuntimeError(
@@ -55,37 +74,38 @@ def safe(val):  # None-safe str()
 
 
 def build_text(row: dict) -> str:
-    parts = [
-        safe(row.get("description")),
-        safe(row.get("name")),
-        safe(row.get("brand")),
-        safe(row.get("gender")),
-        safe(row.get("price")),
-        safe(row.get("primaryColor")),
-    ]
-    # drop empty strings and normalize any stray whitespace
-    return " ".join(p for p in parts if p).strip()
+    """
+    We store a display-formatted price directly in the text to steer the model.
+    """
+    price_disp = _format_price(row.get("price")) or ""
+    return " ".join(
+        [
+            safe(row.get("description")),
+            safe(row.get("name")),
+            safe(row.get("brand")),
+            safe(row.get("gender")),
+            price_disp,  # formatted
+            safe(row.get("primaryColor")),
+        ]
+    ).strip()
+
 
 def main():
-    # Pinecone client
     pinecone_api_key = os.getenv("PINECONE_API_KEY")
     if not pinecone_api_key:
         raise RuntimeError("PINECONE_API_KEY is not set.")
     pc = Pinecone(api_key=pinecone_api_key)
 
-    # Ensure index
     idx = ensure_pinecone_index(pc, PINECONE_INDEX, EMBEDDING_DIM)
 
-    # Embeddings provider (Vertex by default; switch with EMBEDDINGS_PROVIDER=genai)
     embed = get_embeddings()
 
-    # Preflight
+    # Preflight embed call
     try:
         _ = embed.embed_documents(["ping"])
     except Exception as e:
         raise RuntimeError(f"Embedding preflight failed: {e}")
 
-    # Data
     df = asyncio.run(fetch_products_df())
     if df.empty:
         print("No data found in products; nothing to sync.")
@@ -102,18 +122,20 @@ def main():
         texts = [build_text(row) for _, row in batch.iterrows()]
         vectors = embed.embed_documents(texts)
 
-        metas = [
-            {
-                "id": row.get("id"),
-                "name": row.get("name"),
-                "description": row.get("description"),
-                "brand": row.get("brand"),
-                "gender": row.get("gender"),
-                "price": row.get("price"),
-                "primaryColor": row.get("primaryColor"),
-            }
-            for _, row in batch.iterrows()
-        ]
+        metas = []
+        for _, row in batch.iterrows():
+            metas.append(
+                {
+                    "id": row.get("id"),
+                    "name": row.get("name"),
+                    "description": row.get("description"),
+                    "brand": row.get("brand"),
+                    "gender": row.get("gender"),
+                    "price": row.get("price"),
+                    "price_display": _format_price(row.get("price")),  # formatted copy
+                    "primaryColor": row.get("primaryColor"),
+                }
+            )
 
         payload = list(zip(ids, vectors, metas))
         idx.upsert(vectors=payload)
