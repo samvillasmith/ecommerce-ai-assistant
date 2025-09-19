@@ -75,19 +75,19 @@ def safe(val):  # None-safe str()
 
 def build_text(row: dict) -> str:
     """
-    We store a display-formatted price directly in the text to steer the model.
+    Build a clean text string from product fields.
+    Filters out None/empty values and avoids double spaces.
     """
-    price_disp = _format_price(row.get("price")) or ""
-    return " ".join(
-        [
-            safe(row.get("description")),
-            safe(row.get("name")),
-            safe(row.get("brand")),
-            safe(row.get("gender")),
-            price_disp,  # formatted
-            safe(row.get("primaryColor")),
-        ]
-    ).strip()
+    fields = [
+        row.get("name"),
+        row.get("brand"),
+        row.get("gender"),
+        row.get("primaryColor"),
+        row.get("description"),
+        row.get("price"),
+    ]
+    # filter out None/empty, strip each, then join
+    return " ".join(str(f).strip() for f in fields if f and str(f).strip())
 
 
 def main():

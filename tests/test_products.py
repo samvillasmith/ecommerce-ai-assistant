@@ -57,9 +57,10 @@ def test_products_success(monkeypatch):
         resp = client.get("/products")
         assert resp.status_code == 200
         assert resp.json() == [
-            {"id": 1, "name": "Vans Authentic"},
-            {"id": 2, "name": "Stan Smith"},
+            {"id": 1, "name": "Vans Authentic", "price_display": None},
+            {"id": 2, "name": "Stan Smith", "price_display": None},
         ]
+
 
     assert fake.connect_calls == 1
     assert fake.disconnect_calls == 1
