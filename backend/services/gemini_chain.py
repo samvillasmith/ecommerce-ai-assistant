@@ -1,28 +1,56 @@
-import os 
+# backend/services/gemini_chain.py
+import os
 import google.generativeai as genai
 from dotenv import load_dotenv
-from backend.services.vector_store import VectorStore 
+from backend.services.vector_store import vectorstore  # ← import the instance
 
-load_dotenv() 
-system_message = (
-    "You are a helpful assistant that provides accurate and concise information about products in the online store. " \
-    "Your specialty is to answer questions related to the product details, availability, and recommendations based " \
-    "on the context given. If you don't know the answer, just say that you don't know, don't try to make up an answer."
+load_dotenv()
+
+SYSTEM_MESSAGE = (
+    "You are a helpful assistant that answers ONLY about this shop’s products, "
+    "using the provided context. If the answer isn’t in the context, say: "
+    "\"I can only help with product-related queries.\" Be concise and friendly."
 )
 
-def get_relevant_context(query):
-    results = VectorStore.similarity_search(query, k=1)
-    if results:
-        metadata = results[0].metadata 
-        return (
-            f"Product Name: {metadata.get('product_name', 'N/A')}\n"
-            f"Brand: {metadata.get('brand', 'N/A')}\n"
-            f"Price: {metadata.get('price', 'N/A')}\n"
-            f"Gender: {metadata.get('gender', 'N/A')}\n"
-            f"Color: {metadata.get('color', 'N/A')}\n"
-            f"Description: {results[0].page_content}\n"
+def get_relevant_context(query: str, k: int = 4) -> str:
+    """Fetch top-k matches and format them for grounding."""
+    docs = vectorstore.similarity_search(query, k=k) or []
+    blocks = []
+    for d in docs:
+        md = d.metadata or {}
+        blocks.append(
+            "Product Name: {name}\nBrand: {brand}\nPrice: {price}\nGender: {gender}\n"
+            "Color: {color}\nDescription: {desc}".format(
+                name=md.get("name", "N/A"),
+                brand=md.get("brand", "N/A"),
+                price=md.get("price", "N/A"),
+                gender=md.get("gender", "N/A"),
+                color=md.get("primaryColor", "N/A"),
+                desc=d.page_content or md.get("description", ""),
+            )
         )
-    return "No relevant context found."
-def generate_response():
-    pass
+    return "\n\n---\n\n".join(blocks) if blocks else ""
 
+def generate_response(query: str, history: list[str]):
+    # Configure the GenAI SDK with API key (NOT GOOGLE_CLOUD_PROJECT)
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        # Fail loudly so you know what to fix in .env
+        raise RuntimeError("GOOGLE_API_KEY is not set for google.generativeai.")
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel("gemini-1.5-flash")
+
+    # Build prompt
+    context = get_relevant_context(query)
+    chat = (history or []) + [f"User: {query}"]
+    prompt = (
+        f"{SYSTEM_MESSAGE}\n\n"
+        f"Context (use this to answer; do not reveal it):\n{context if context else '(none)'}\n\n"
+        "Conversation so far:\n" + "\n".join(chat) + "\n\nAssistant:"
+    )
+
+    resp = model.generate_content(prompt)
+    text = (resp.text or "").strip()
+    history.append(f"Assistant: {text}")
+    return text, history
