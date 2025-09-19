@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 // jest.config.cjs
 const nextJest = require("next/jest");
 const createJestConfig = nextJest({ dir: "./" });
