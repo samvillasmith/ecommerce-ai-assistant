@@ -1,22 +1,176 @@
 # E-commerce AI Shopping Assistant
 
-AI-powered conversational shopping assistant that helps customers find products through natural language queries. Built with Google Gemini, Pinecone vector search, and FastAPI.
+AI-powered conversational shopping assistant built with Google Gemini, Pinecone vector search, and FastAPI. Customers can ask natural language questions like "show me Nike shoes under $100" and get intelligent product recommendations.
 
-## Overview
+## 🚀 Quick Start
 
-This system enables customers to ask questions like "show me Nike shoes under $100" or "do you have black Vans?" and receive intelligent, context-aware product recommendations powered by retrieval-augmented generation (RAG).
+### Prerequisites
 
-## Features
+- **Python 3.10+**
+- **Node.js 18+**
+- **MySQL database**
+- **Google Cloud account** (for Vertex AI) **OR** **Google AI Studio API key**
+- **Pinecone account**
 
-- **Natural Language Search**: Query products conversationally instead of traditional filters
-- **RAG-Powered Responses**: Pinecone vector similarity search for semantic product matching
-- **Multi-Product Enumeration**: Handles "list all X" queries by returning multiple relevant products
-- **Brand Extraction**: Automatically detects brand names in queries for focused results
-- **Price Normalization**: Consistent currency formatting across responses
-- **Real-time Chat Interface**: Responsive Next.js frontend with session-based conversation memory
-- **Comprehensive Testing**: Full test coverage with pytest and Jest
+### 1. Clone & Install
 
-## Architecture
+```bash
+git clone <repository-url>
+cd ecommerce-ai-assistant
+
+# Backend
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+prisma generate
+
+# Frontend
+cd shop-frontend
+npm install
+```
+
+### 2. Environment Variables - **CRITICAL SETUP**
+
+Create **`.env`** in the **project root**:
+
+```env
+# ============================================================================
+# DATABASE (REQUIRED)
+# ============================================================================
+DATABASE_URL="mysql://username:password@localhost:3306/ecommerce_db"
+
+# ============================================================================
+# GOOGLE AI - CHOOSE ONE OPTION
+# ============================================================================
+# Option 1: Vertex AI (Production - Recommended)
+EMBEDDINGS_PROVIDER=vertex
+GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+GOOGLE_CLOUD_LOCATION=us-central1
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
+
+# Option 2: Google AI Studio (Development/Testing)
+# EMBEDDINGS_PROVIDER=genai
+# GOOGLE_API_KEY=your-google-ai-studio-api-key
+
+# ============================================================================
+# PINECONE (REQUIRED)
+# ============================================================================
+PINECONE_API_KEY=your-pinecone-api-key
+PINECONE_INDEX_NAME=ecommerce-ai-assistant
+PINECONE_NAMESPACE=
+PINECONE_CLOUD=aws
+PINECONE_REGION=us-east-1
+
+# ============================================================================
+# OPTIONAL SETTINGS
+# ============================================================================
+EMBED_BATCH_SIZE=32
+```
+
+Create **`shop-frontend/.env.local`**:
+
+```env
+NEXT_PUBLIC_API_BASE=http://127.0.0.1:8000
+```
+
+### 3. Setup Database & Vectors
+
+```bash
+# Create database schema
+prisma migrate dev
+
+# Load product catalog (from CSV)
+python load_data.py
+
+# Generate embeddings and sync to Pinecone (THIS CREATES THE INDEX)
+python -m embedding.sync_pinecone
+```
+
+### 4. Run Application
+
+**Terminal 1 - Backend:**
+```bash
+uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+**Terminal 2 - Frontend:**
+```bash
+cd shop-frontend
+npm run dev
+```
+
+Open **http://localhost:3000**
+
+---
+
+## 🔑 Environment Variables Explained
+
+### Database Configuration
+
+| Variable | Required | Description | Example |
+|----------|----------|-------------|---------|
+| `DATABASE_URL` | ✅ Yes | MySQL connection string | `mysql://user:pass@localhost:3306/dbname` |
+
+### Embeddings Provider (Choose ONE)
+
+#### Option A: Vertex AI (Production)
+
+| Variable | Required | Description | Example |
+|----------|----------|-------------|---------|
+| `EMBEDDINGS_PROVIDER` | ✅ Yes | Set to `vertex` | `vertex` |
+| `GOOGLE_CLOUD_PROJECT` | ✅ Yes | Your GCP project ID | `my-project-123456` |
+| `GOOGLE_CLOUD_LOCATION` | ⚠️ Optional | GCP region | `us-central1` (default) |
+| `GOOGLE_APPLICATION_CREDENTIALS` | ✅ Yes | Path to service account JSON | `/path/to/key.json` |
+
+**Getting Vertex AI credentials:**
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Enable Vertex AI API
+3. Create service account with "Vertex AI User" role
+4. Download JSON key file
+5. Set `GOOGLE_APPLICATION_CREDENTIALS` to the file path
+
+#### Option B: Google AI Studio (Development)
+
+| Variable | Required | Description | Example |
+|----------|----------|-------------|---------|
+| `EMBEDDINGS_PROVIDER` | ✅ Yes | Set to `genai` | `genai` |
+| `GOOGLE_API_KEY` | ✅ Yes | API key from AI Studio | `AIzaSy...` |
+
+**Getting AI Studio key:**
+1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Click "Create API Key"
+3. Copy the key to `GOOGLE_API_KEY`
+
+### Pinecone Configuration
+
+| Variable | Required | Description | Example |
+|----------|----------|-------------|---------|
+| `PINECONE_API_KEY` | ✅ Yes | Pinecone API key | `pcsk_...` |
+| `PINECONE_INDEX_NAME` | ⚠️ Optional | Index name | `ecommerce-ai-assistant` (default) |
+| `PINECONE_NAMESPACE` | ❌ No | Namespace for multi-tenancy | `` (empty default) |
+| `PINECONE_CLOUD` | ⚠️ Optional | Cloud provider | `aws` (default) |
+| `PINECONE_REGION` | ⚠️ Optional | Region | `us-east-1` (default) |
+
+**Getting Pinecone credentials:**
+1. Sign up at [Pinecone](https://www.pinecone.io)
+2. Create a free account
+3. Copy API key from dashboard
+
+### Frontend Configuration
+
+| Variable | Required | Description | Example |
+|----------|----------|-------------|---------|
+| `NEXT_PUBLIC_API_BASE` | ✅ Yes | Backend API URL | `http://127.0.0.1:8000` |
+
+### Optional Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `EMBED_BATCH_SIZE` | `32` | Batch size for embedding generation |
+
+---
+
+## 🏗️ Architecture
 
 ```
 ┌─────────────────┐          ┌──────────────────┐
@@ -35,153 +189,83 @@ This system enables customers to ask questions like "show me Nike shoes under $1
 ```
 
 **Flow:**
-1. User sends query → Next.js frontend
-2. Frontend calls FastAPI `/chat` endpoint
-3. Backend retrieves conversation history (if any)
-4. Performs vector similarity search in Pinecone for relevant products
-5. Constructs prompt with search results + context
-6. Gemini generates natural language response
-7. Response returned to frontend and displayed
+1. User query → Next.js frontend
+2. Frontend → FastAPI `/chat` endpoint
+3. Backend retrieves conversation history
+4. **Pinecone vector search** finds similar products
+5. **Gemini generates** natural language response with RAG context
+6. Response → Frontend
 
-## Tech Stack
+---
 
-**Backend:**
-- FastAPI - Web framework
-- Google Gemini 1.5 Flash - LLM for response generation
-- Pinecone - Vector database for semantic search
-- Google Vertex AI / GenAI - Embeddings (text-embedding-004 / embedding-001)
-- Prisma - Database ORM
-- MySQL - Product catalog storage
-- LangChain - RAG orchestration
-- Python 3.10+
+## 📁 Project Structure
 
-**Frontend:**
-- Next.js 15 - React framework
-- TypeScript - Type safety
-- Tailwind CSS 4 - Styling
-- Jest + React Testing Library - Testing
+```
+.
+├── .env                          # ⚠️ ENVIRONMENT VARIABLES (CREATE THIS)
+├── backend/
+│   ├── db/                       # Database connection
+│   ├── routes/
+│   │   ├── chat.py              # Chat endpoint
+│   │   └── products.py          # Products API
+│   ├── services/
+│   │   ├── gemini_chain.py      # Gemini + RAG logic
+│   │   ├── vector_store.py      # Pinecone setup
+│   │   └── price.py             # Price formatting
+│   └── main.py                  # FastAPI app
+├── embedding/
+│   └── sync_pinecone.py         # ⚠️ RUN THIS TO POPULATE VECTORS
+├── providers/
+│   └── embeddings.py            # Embedding provider abstraction
+├── shop-frontend/
+│   ├── .env.local               # ⚠️ FRONTEND ENV (CREATE THIS)
+│   ├── app/
+│   │   └── page.tsx             # Chat UI
+│   └── __tests__/               # Frontend tests
+├── tests/                        # Backend tests
+├── prisma/schema.prisma         # Database schema
+├── shop-product-catalog.csv     # Product data
+├── load_data.py                 # ⚠️ RUN THIS FIRST
+└── requirements.txt
+```
 
-## Prerequisites
+---
 
-- Python 3.10+
-- Node.js 18+
-- MySQL database
-- Google Cloud project (for Vertex AI) OR Google AI Studio API key
-- Pinecone account and API key
+## 🧪 Testing
 
-## Setup Instructions
-
-### 1. Clone Repository
+### Backend Tests
 
 ```bash
-git clone <repository-url>
-cd ecommerce-ai-assistant
+# Run all tests
+pytest
+
+# With coverage
+pytest --cov=backend --cov-report=html
+
+# Specific test
+pytest tests/test_chat.py -v
 ```
 
-### 2. Backend Setup
-
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Generate Prisma client
-prisma generate
-```
-
-### 3. Environment Variables
-
-Create a `.env` file in the root directory:
-
-```env
-# Database
-DATABASE_URL="mysql://user:password@localhost:3306/ecommerce_db"
-
-# Google AI (choose ONE option)
-# Option 1: Vertex AI (recommended for production)
-EMBEDDINGS_PROVIDER=vertex
-GOOGLE_CLOUD_PROJECT=your-project-id
-GOOGLE_CLOUD_LOCATION=us-central1
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
-
-# Option 2: Google AI Studio (for development)
-EMBEDDINGS_PROVIDER=genai
-GOOGLE_API_KEY=your-google-api-key
-
-# Pinecone
-PINECONE_API_KEY=your-pinecone-api-key
-PINECONE_INDEX_NAME=ecommerce-ai-assistant
-PINECONE_NAMESPACE=  # Optional
-PINECONE_CLOUD=aws
-PINECONE_REGION=us-east-1
-
-# Embedding batch size (optional)
-EMBED_BATCH_SIZE=32
-```
-
-### 4. Database Setup
-
-```bash
-# Run Prisma migrations
-prisma migrate dev
-
-# Load product catalog
-python load_data.py
-```
-
-This loads products from `shop-product-catalog.csv` into MySQL.
-
-### 5. Vector Database Setup
-
-Sync products to Pinecone with embeddings:
-
-```bash
-python -m embedding.sync_pinecone
-```
-
-This will:
-- Create Pinecone index if it doesn't exist (768 dimensions, cosine similarity)
-- Generate embeddings for all products
-- Upsert vectors with metadata (name, brand, price, description, etc.)
-
-### 6. Frontend Setup
+### Frontend Tests
 
 ```bash
 cd shop-frontend
-npm install
+npm test
 
-# Create .env.local
-echo "NEXT_PUBLIC_API_BASE=http://127.0.0.1:8000" > .env.local
+# Watch mode
+npm test -- --watch
+
+# Coverage
+npm test -- --coverage
 ```
 
-## Running the Application
+---
 
-### Start Backend (FastAPI)
+## 🔧 API Endpoints
 
-```bash
-# From project root
-uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
-```
+### `POST /chat`
 
-API will be available at `http://127.0.0.1:8000`
-
-### Start Frontend (Next.js)
-
-```bash
-cd shop-frontend
-npm run dev
-```
-
-Frontend will be available at `http://localhost:3000`
-
-## API Endpoints
-
-### POST /chat
-
-Send a chat message and receive AI response.
+Send chat message, get AI response.
 
 **Request:**
 ```json
@@ -194,17 +278,17 @@ Send a chat message and receive AI response.
 **Response:**
 ```json
 {
-  "response": "Here are some Nike shoes under $100:\n- Nike Air Max 270 ($109.99)\n- Nike Presto Fly ($89.99)",
+  "response": "Here are Nike shoes under $100:\n- Nike Air Max 270 ($109.99)\n- Nike Presto Fly ($89.99)",
   "history": [
     "User: show me Nike shoes under $100",
-    "Assistant: Here are some Nike shoes under $100:..."
+    "Assistant: Here are Nike shoes under $100:..."
   ]
 }
 ```
 
-### GET /products
+### `GET /products`
 
-Retrieve all products from the database.
+Retrieve all products.
 
 **Response:**
 ```json
@@ -222,177 +306,79 @@ Retrieve all products from the database.
 ]
 ```
 
-## Testing
+---
 
-### Backend Tests
+## ⚠️ Troubleshooting
 
-```bash
-# Run all tests
-pytest
+### "GOOGLE_CLOUD_PROJECT not set"
 
-# Run with coverage
-pytest --cov=backend --cov-report=html
-
-# Run specific test file
-pytest tests/test_chat.py -v
-```
-
-Test coverage includes:
-- Chat endpoint functionality
-- Database connection handling
-- Price formatting
-- Vector store initialization
-- Pinecone sync logic
-- Provider embeddings
-
-### Frontend Tests
-
-```bash
-cd shop-frontend
-npm test
-
-# Watch mode
-npm test -- --watch
-
-# Coverage
-npm test -- --coverage
-```
-
-## Project Structure
-
-```
-.
-├── backend/
-│   ├── db/              # Database connection
-│   ├── routes/          # API endpoints
-│   │   ├── chat.py      # Chat endpoint
-│   │   └── products.py  # Products endpoint
-│   ├── services/        # Business logic
-│   │   ├── gemini_chain.py    # Gemini + RAG integration
-│   │   ├── vector_store.py    # Pinecone setup
-│   │   └── price.py           # Price formatting
-│   └── main.py          # FastAPI app
-├── embedding/
-│   └── sync_pinecone.py # Product embedding & sync
-├── providers/
-│   └── embeddings.py    # Embedding provider abstraction
-├── shop-frontend/       # Next.js application
-│   ├── app/
-│   │   └── page.tsx     # Main chat interface
-│   └── __tests__/       # Frontend tests
-├── tests/               # Backend tests
-├── prisma/
-│   └── schema.prisma    # Database schema
-├── shop-product-catalog.csv  # Product data
-├── load_data.py         # CSV → MySQL loader
-└── requirements.txt     # Python dependencies
-```
-
-## Key Components
-
-### Gemini Chain (`backend/services/gemini_chain.py`)
-
-- Constructs prompts with system instructions + conversation history + RAG context
-- Performs vector similarity search via Pinecone
-- Handles multi-product enumeration for "list all X" queries
-- Extracts brand hints from natural language
-- Formats prices consistently ($XX.XX)
-
-### Vector Store (`backend/services/vector_store.py`)
-
-- Abstracts Pinecone initialization
-- Supports both Vertex AI and Google GenAI embeddings
-- Uses `text-embedding-004` (768 dimensions) by default
-
-### Sync Script (`embedding/sync_pinecone.py`)
-
-- Batched embedding generation for performance
-- Stores metadata: name, brand, price, description, gender, color
-- Includes formatted price_display field for consistent rendering
-- Handles empty/None values safely
-
-## Configuration
-
-### Embedding Providers
-
-**Vertex AI (Production):**
+**Solution:** If using Vertex AI, set all three variables:
 ```env
 EMBEDDINGS_PROVIDER=vertex
-GOOGLE_CLOUD_PROJECT=your-project
+GOOGLE_CLOUD_PROJECT=your-project-id
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
 ```
 
-**Google AI Studio (Development):**
+### "GOOGLE_API_KEY is not set"
+
+**Solution:** If using AI Studio, set:
 ```env
 EMBEDDINGS_PROVIDER=genai
 GOOGLE_API_KEY=your-api-key
 ```
 
-### Pinecone Index Settings
-
-- **Dimensions**: 768 (matches text-embedding-004)
-- **Metric**: Cosine similarity
-- **Cloud**: AWS
-- **Region**: us-east-1 (configurable)
-
-## Troubleshooting
-
 ### "No relevant context found"
 
-**Cause**: Pinecone index is empty or not synced.
+**Cause:** Pinecone index is empty.
 
-**Solution**:
+**Solution:**
 ```bash
 python -m embedding.sync_pinecone
 ```
 
-### "GOOGLE_CLOUD_PROJECT not set"
+### Frontend can't connect to backend
 
-**Cause**: Using Vertex AI without proper configuration.
-
-**Solution**: Set environment variables or switch to GenAI provider.
+**Check:**
+1. Backend is running: `http://127.0.0.1:8000/docs`
+2. Frontend `.env.local` has correct URL:
+   ```env
+   NEXT_PUBLIC_API_BASE=http://127.0.0.1:8000
+   ```
 
 ### Price formatting issues
 
-**Cause**: Database stores prices as integers (cents).
+Prices in database are stored as integers (cents). The system automatically converts:
+- `10999` → `$109.99`
+- `5499` → `$54.99`
 
-**Solution**: The system automatically converts cents to dollars. Ensure `price.py` logic matches your data format.
+---
 
-### Frontend can't connect to backend
+## 🎯 Features
 
-**Cause**: CORS or incorrect API URL.
+- ✅ **Natural Language Search** - "show me black Vans under $50"
+- ✅ **RAG-Powered** - Semantic search with Pinecone vectors
+- ✅ **Multi-Product Listings** - "list all Nike shoes"
+- ✅ **Brand Detection** - Automatically filters by mentioned brands
+- ✅ **Price Normalization** - Consistent `$XX.XX` formatting
+- ✅ **Session Memory** - Conversation history per browser tab
+- ✅ **Full Test Coverage** - Pytest + Jest
 
-**Solution**: 
-1. Check `NEXT_PUBLIC_API_BASE` in frontend `.env.local`
-2. Verify FastAPI CORS middleware allows frontend origin
+---
 
-## Performance Considerations
-
-- **Embedding Batch Size**: Default 32, adjust via `EMBED_BATCH_SIZE`
-- **Pinecone Query**: Returns top 10 results, filters by brand when detected
-- **Response Time**: ~500ms for query → embedding → Pinecone → Gemini → response
-- **Rate Limiting**: Consider implementing for production use
-
-## Future Enhancements
-
-- [ ] Add user authentication
-- [ ] Implement conversation memory persistence
-- [ ] Add product images to responses
-- [ ] Support multi-language queries
-- [ ] Add filtering by price range, gender, color
-- [ ] Implement clickable product cards in responses
-- [ ] Add analytics and query logging
-- [ ] Support voice input/output
-
-## License
+## 📝 License
 
 MIT
 
-## Contributing
+---
 
-Pull requests welcome! Please ensure tests pass before submitting.
+## 🚨 CRITICAL REMINDERS
 
-```bash
-# Run all checks
-pytest && cd shop-frontend && npm test
-```
+1. **ALWAYS run `python -m embedding.sync_pinecone` after loading products**
+2. **Set EMBEDDINGS_PROVIDER to either `vertex` or `genai`** - don't mix them
+3. **Don't commit `.env` or `.env.local` to version control**
+4. **MySQL database must be created before running migrations**
+5. **Pinecone free tier works fine for development**
+
+---
+
+**Need help?** Check `/docs` endpoint when backend is running: `http://127.0.0.1:8000/docs`
